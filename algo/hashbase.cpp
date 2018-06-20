@@ -28,11 +28,10 @@ HashBase::~HashBase()
 
 }
 
-void HashBase::init(
-  Schema *schema1, vector<unsigned int> select1, unsigned int jattr1,
-  Schema *schema2, vector<unsigned int> select2, unsigned int jattr2)
+void HashBase::init(Schema *schema1, vector<unsigned int> select1, unsigned int jattr1,
+  Schema *schema2, vector<unsigned int> select2, unsigned int jattr2, unsigned int selectivity, unsigned long long cond_s, unsigned long long cond_e)
 {
-    BaseAlgo::init(schema1,select1,jattr1,schema2,select2,jattr2);
+    BaseAlgo::init(schema1,select1,jattr1,schema2,select2,jattr2,selectivity,cond_s,cond_e);
 }
 
 void HashBase::destroy()

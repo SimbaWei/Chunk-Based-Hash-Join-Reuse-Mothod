@@ -26,6 +26,7 @@
 #include "hashtable.h"
 #include "common/cache.h"
 
+
 class BaseAlgo
 {
     public:
@@ -34,7 +35,8 @@ class BaseAlgo
 
         virtual void init(
             Schema* schema1, vector<unsigned int> select1, unsigned int jattr1,
-            Schema* schema2, vector<unsigned int> select2, unsigned int jattr2);
+            Schema* schema2, vector<unsigned int> select2, unsigned int jattr2,
+            unsigned int selectivity, unsigned long long cond_s,unsigned long long cond_e);
 
         virtual void destroy();
 
@@ -43,7 +45,8 @@ class BaseAlgo
     protected:
         Schema* s1_, * s2_, * sout_, * sbuild_;
         vector<unsigned int> sel1_, sel2_;
-        unsigned int ja1_, ja2_, size_, s1cols_;
+        unsigned int ja1_, ja2_, size_, selectivity_;
+        unsigned long long cond_s_, cond_e_;
 };
 
 
@@ -54,12 +57,13 @@ class HashBase : public BaseAlgo
         virtual ~HashBase();
         virtual void init(
            Schema* schema1, vector<unsigned int> select1, unsigned int jattr1,
-           Schema* schema2, vector<unsigned int> select2, unsigned int jattr2);
+           Schema* schema2, vector<unsigned int> select2, unsigned int jattr2,
+           unsigned int selectivity, unsigned long long cond_s, unsigned long long cond_e);
         virtual void destroy();
         virtual void build(PageCursor* t, HashTable* hashtable) = 0;
         virtual PageCursor* probe(PageCursor* t, HashTable* hashtable) = 0;
     protected:
-        HashTable hashtable_;
+        //HashTable hashtable_;
         int outputsize_;
 };
 
@@ -71,7 +75,8 @@ class StoreCopy : public HashBase
 
         virtual void init(
            Schema* schema1, vector<unsigned int> select1, unsigned int jattr1,
-           Schema* schema2, vector<unsigned int> select2, unsigned int jattr2);
+           Schema* schema2, vector<unsigned int> select2, unsigned int jattr2,
+           unsigned int selectivity, unsigned long long cond_s, unsigned long long cond_e);
         virtual void destroy();
 
         virtual void build(PageCursor* t, HashTable* hashtable) = 0;
@@ -98,7 +103,8 @@ class StorePointer : public HashBase
 
         virtual void init(
             Schema* schema1, vector<unsigned int> select1, unsigned int jattr1,
-            Schema* schema2, vector<unsigned int> select2, unsigned int jattr2);
+            Schema* schema2, vector<unsigned int> select2, unsigned int jattr2,
+            unsigned int selectivity, unsigned long long cond_s, unsigned long long cond_e);
         virtual void destroy();
 
         virtual void build(PageCursor* t, HashTable* hashtable) = 0;
@@ -123,7 +129,7 @@ class BuildPhase : public Super
     public:
         BuildPhase(const libconfig::Setting& cfg) : Super(cfg) {}
         virtual ~BuildPhase() {}
-        virtual void build(PageCursor* t);
+        virtual void build(PageCursor* t, HashTable* hashtable);
 };
 
 
@@ -133,7 +139,7 @@ class ProbePhase : public Super
     public:
         ProbePhase(const libconfig::Setting& cfg) : Super(cfg) {}
         virtual ~ProbePhase() {}
-        virtual PageCursor* probe(PageCursor* t);
+        virtual PageCursor* probe(PageCursor* t, HashTable* hashtable);
 };
 
 

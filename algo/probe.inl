@@ -16,7 +16,7 @@
 */
 
 template <typename Super>
-PageCursor* ProbePhase<Super>::probe(PageCursor* t)
+PageCursor* ProbePhase<Super>::probe(PageCursor* t, HashTable* hashtable)
 {
-    return Super::probeCursor(t,true);
+    return Super::probeCursor(t,hashtable,true);
 }

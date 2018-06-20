@@ -20,15 +20,19 @@
 
 using namespace std;
 
-void BaseAlgo::init(
-  Schema *schema1, vector<unsigned int> select1, unsigned int jattr1,
-  Schema *schema2, vector<unsigned int> select2, unsigned int jattr2)
+void BaseAlgo::init(Schema *schema1, vector<unsigned int> select1, unsigned int jattr1,
+  Schema *schema2, vector<unsigned int> select2,
+  unsigned int jattr2, unsigned int selectivity,
+  unsigned long long cond_s, unsigned long long cond_e)
 {
     s2_ = schema2;
     sel1_ = select1;
     sel2_ = select2;
     ja1_ = jattr1;
     ja2_ = jattr2;
+    selectivity_ = selectivity;
+    cond_s_ = cond_s;
+    cond_e_ = cond_e;
 
     sout_ = new Schema();
     sbuild_ = new Schema();

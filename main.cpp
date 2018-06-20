@@ -24,6 +24,8 @@
 #include <libconfig.h++>
 #include "algo/algo.h"
 #include "joinerfactory.h"
+#include <cstdlib>
+#include <ctime>
 
 using namespace libconfig;
 using namespace std;
@@ -58,6 +60,9 @@ int main(int argc, char** argv)
     string datapath, infilename, outfilename, outputfile;
     unsigned int bucksize;
     vector<unsigned int> select1, select2;
+    unsigned int num;
+    unsigned int selectivity;
+    unsigned long long total;
 
     Config cfg;
 
@@ -67,6 +72,9 @@ int main(int argc, char** argv)
     datapath = (const char*) cfg.lookup("path");
     outputfile = (const char*) cfg.lookup("output");
 
+    num  = cfg.lookup("algorithm.num");
+    selectivity =  cfg.lookup("algorithm.num");
+    total = cfg.lookup("algorithm.total");
     infilename = (const char*)cfg.lookup("build.file");
     bucksize = cfg.lookup("bucksize");
     sin = Schema::create(cfg.lookup("build.schema"));
@@ -117,6 +125,12 @@ int main(int argc, char** argv)
 
     cout << endl;
     cout << "Finishing the joiner init!" << flush;
+
+    for(unsigned int i = 0; i < num; i++)
+    {
+        srand((unsigned)time(NULL));
+        random(1,total);
+    }
 
     joiner->build(tin);
 
