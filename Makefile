@@ -23,7 +23,7 @@ endif
 
 all: dist reuse-demo
 
-FILES = common/schema.o common/parser.o common/table.o common/loader.o common/page.o  common/hash.h common/hash.cpp\
+FILES = common/schema.o common/parser.o common/table.o common/loader.o common/page.o  common/hash.h common/hash.cpp common/cache.o common/rdtsc.h\
 		algo/algo.h algo/base.cpp algo/hashbase.cpp algo/hashtable.o algo/storage.o\
 		joinerfactory.o
 

@@ -25,15 +25,16 @@ struct ht_node
 {
     unsigned long long start_value_;
     unsigned long long end_value_;
-    HashTable hashtable_;
+    HashTable* hashtable_;
     ht_node* next_;
+    bool init_;
 };
 
 class ReuseCache
 {
     public:
-        ReuseCache(max_cache_size)
-            :max_cache_size_(max_cache_size)
+        ReuseCache(unsigned long long max_cache_size)
+            : max_cache_size_(max_cache_size)
         {
             cache_head_ = NULL;
             curr_cache_size_ = 0;
@@ -52,6 +53,8 @@ class ReuseCache
         void destroy();
 
         void garbage_collection(); ///< LRU algorithm.
+
+        void print_cache();
 
     private:
         ht_node* cache_head_;

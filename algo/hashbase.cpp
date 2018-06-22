@@ -20,7 +20,7 @@ HashBase::HashBase(const libconfig::Setting &cfg)
     : BaseAlgo(cfg)
 {
     size_ = cfg["algorithm"]["buildpagesize"];
-    outputsize_ = cfg["bucksize"];
+    outputsize_ = cfg["buffsize"];
 }
 
 HashBase::~HashBase()

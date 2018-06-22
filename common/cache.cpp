@@ -17,6 +17,8 @@
 
 #include "cache.h"
 #include "exceptions.h"
+#include<stdio.h>
+#include<stdlib.h>
 
 using namespace std;
 
@@ -29,24 +31,28 @@ ht_node* ReuseCache::insert(
 {
     if(NULL != cache_head_)
     {
-        ht_node* node  =(ht_node*)new ht_node();
+        ht_node* node = (ht_node*)malloc(sizeof(ht_node));
         node->start_value_ = start;
         node->end_value_ = end;
-        node->hashtable_.init((end-start)/2,bucksize,tuplesize);
+        node->hashtable_ = (HashTable*)malloc(sizeof(HashTable));
+        node->hashtable_->init((end-start)/2,bucksize,tuplesize);
         node->next_ = cache_head_;
         cache_head_ = node;
-
+        cache_head_->init_ = true;
         curr_cache_size_ = curr_cache_size_ + end - start;
-
-        return cache_head_;
+        cout<< "head is not null!"<<flush<<endl;
     }
     else
     {
-        cache_head_ = (ht_node*)new ht_node();
+        cache_head_ = (ht_node*)malloc(sizeof(ht_node));
         cache_head_->start_value_ = start;
         cache_head_->end_value_ = end;
-        cache_head_->hashtable_.init((end-start)/2,bucksize,tuplesize);
+        cache_head_->hashtable_ = (HashTable*)malloc(sizeof(HashTable));
+        cache_head_->hashtable_->init((end-start)/2,bucksize,tuplesize);
+        cache_head_->init_ = true;
         cache_head_->next_ =NULL;
+        cout<< "head is null!"<<flush<<endl;
+        curr_cache_size_ = curr_cache_size_+ end - start;
     }
 
     return cache_head_;
@@ -58,7 +64,7 @@ ht_node* ReuseCache::get_reusable_ht(unsigned long long start, unsigned long lon
     ht_node* ret = NULL;
     ht_node* target = NULL;
     ret = cache_head_;
-    double ratio;
+    double ratio = 0;
     while(NULL != ret)
     {
         if(ret->start_value_ >= end || ret->end_value_ <= start)
@@ -70,7 +76,8 @@ ht_node* ReuseCache::get_reusable_ht(unsigned long long start, unsigned long lon
             unsigned long long interval1 = end - start;
             unsigned long long interval2 = (ret->end_value_ >= end ? ret->end_value_ : end)
                     - (ret->start_value_ <= start ? ret->start_value_ : start);
-            double tmp_ratio = (double)(interval1/interval2);
+            double tmp_ratio = (double)(interval1*1.0/interval2);
+            cout<< "tmp_ratio is "<<tmp_ratio<<flush<<endl;
             if(ratio < tmp_ratio)
             {
                 target = ret;
@@ -80,8 +87,12 @@ ht_node* ReuseCache::get_reusable_ht(unsigned long long start, unsigned long lon
         }
         ret =  ret->next_;
     }
-    if(ratio >= 0.6)
+    if(ratio >= 0.3)
     {
+        curr_cache_size_ = curr_cache_size_ - (target->end_value_ - target->start_value_);
+        unsigned long long start_value = start < target->start_value_ ? start : target->start_value_;
+        unsigned long long end_value = end > target->end_value_ ? end : target->end_value_;
+        curr_cache_size_ = curr_cache_size_ + (end_value - start_value);
         return target;
     }
     else
@@ -102,6 +113,8 @@ void ReuseCache::destroy()
     while (cache_head_ != NULL) {
         node = cache_head_;
         cache_head_ = cache_head_->next_;
+        node->hashtable_->destroy();
+        delete node->hashtable_;
         delete node;
     }
 }
@@ -140,6 +153,16 @@ void ReuseCache::garbage_collection()
     }
 }
 
+
+void ReuseCache::print_cache()
+{
+    ht_node* node = cache_head_;
+    while(node != NULL)
+    {
+        cout<< "hashtable["<<node->start_value_<<","<<node->end_value_<<"]"<<flush<<endl;
+        node = node->next_;
+    }
+}
 
 
 

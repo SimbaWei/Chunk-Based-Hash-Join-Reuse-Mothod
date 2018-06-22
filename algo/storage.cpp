@@ -44,17 +44,17 @@ void StorePointer::destroy()
     //hashtable_.destroy();
 }
 
-void StoreCopy::buildCursor(PageCursor *t, HashTable* hashtable, bool atomic)
+void StoreCopy::buildCursor(PageCursor *t, ht_node *node, bool atomic)
 {
     if(atomic)
-        realbuildCursor<true>(t,hashtable);
+        realbuildCursor<true>(t,node);
     else
-        realbuildCursor<false>(t,hashtable);
+        realbuildCursor<false>(t,node);
 
 }
 
 template<bool atomic>
-void StoreCopy::realbuildCursor(PageCursor* t, HashTable* hashtable)
+void StoreCopy::realbuildCursor(PageCursor* t, ht_node *node)
 {
     int i = 0;
     void* tup;
@@ -62,7 +62,11 @@ void StoreCopy::realbuildCursor(PageCursor* t, HashTable* hashtable)
     Schema*s  = t->schema();
     unsigned int curbuc;
     unsigned int buckpos;
-    unsigned int nbuckets = hashtable->get_bucket_num();
+    unsigned int nbuckets = node->hashtable_->get_bucket_num();
+    if(node->init_)
+    {
+        cout << "It is new node"<<flush<<endl;
+    }
     while (b = (atomic ? t->atomic_read_next() : t->read_next()))
     {
         i = 0;
@@ -70,12 +74,21 @@ void StoreCopy::realbuildCursor(PageCursor* t, HashTable* hashtable)
         {
             // find hash table to append
             unsigned long long value1 = s->as_long(tup,ja1_);
-            cout<< "value1 is " << value1 <<endl;
+            if(value1 < cond_s_ || value1 > cond_e_)
+            {
+                continue;
+            }
+            if(value1 >= node->start_value_ && value1 <= node->end_value_ && !(node->init_))
+            {
+                //cout<<"should be here"<<endl;
+                continue;
+            }
+            //cout<< "value1 is " << value1 <<endl;
             curbuc = murmurhash2(&value1,s->get_column_type_size(ja1_),0);
             buckpos = curbuc % nbuckets;
-            cout<< "cal value1 is " << curbuc << "buckpos is " << buckpos <<"\t" <<"curbuc is "<< curbuc<<endl;
-            void* target = atomic ? hashtable->atomic_allocate(buckpos) :
-                                    hashtable->allocate(buckpos);
+            //cout<< "cal value1 is " << curbuc << "buckpos is " << buckpos <<"\t" <<"curbuc is "<< curbuc<<endl;
+            void* target = atomic ? node->hashtable_->atomic_allocate(buckpos) :
+                                    node->hashtable_->allocate(buckpos);
 
 #ifdef VERBOSE
         cout << "Adding tuple with key "
@@ -91,19 +104,25 @@ void StoreCopy::realbuildCursor(PageCursor* t, HashTable* hashtable)
             }
         }
     }
-    cout << "Finishing build hashtable!" << endl;
+    node->start_value_ = cond_s_ < node->start_value_ ? cond_s_ : node->start_value_;
+    node->end_value_ = cond_e_ > node->end_value_ ? cond_e_ : node->end_value_;
+    node->init_ = false;
+    //node->hashtable_->print();
+    cout << "cond_s:"<<cond_s_<<" cond_e:"<<cond_e_<<endl;
+    cout << "start:"<<node->start_value_<<" end:"<<node->end_value_<<endl;
+    cout << "Finishing build hashtable!, cache hashtable:["<<node->start_value_<<","<<node->end_value_<<"]" << endl;
 }
 
-WriteTable* StoreCopy::probeCursor(PageCursor *t, HashTable *hashtable, bool atomic, WriteTable *ret)
+WriteTable* StoreCopy::probeCursor(PageCursor *t, ht_node *node, bool atomic, WriteTable *ret)
 {
     if (atomic)
-        return realprobeCursor<true>(t,hashtable, ret);
-    return realprobeCursor<false>(t,hashtable, ret);
+        return realprobeCursor<true>(t,node, ret);
+    return realprobeCursor<false>(t,node, ret);
 }
 
 
 template<bool atomic>
-WriteTable* StoreCopy::realprobeCursor(PageCursor* t, HashTable *hashtable, WriteTable* ret)
+WriteTable* StoreCopy::realprobeCursor(PageCursor* t, ht_node *node, WriteTable* ret)
 {
     if(ret == NULL)
     {
@@ -117,9 +136,9 @@ WriteTable* StoreCopy::realprobeCursor(PageCursor* t, HashTable *hashtable, Writ
 
     Page* b2;
     unsigned int curbuc, i, buckpos;
-    unsigned nbuckets = hashtable.get_bucket_num();
+    unsigned nbuckets = node->hashtable_->get_bucket_num();
 
-    HashTable::Iterator it = hashtable.create_iterator();
+    HashTable::Iterator it = node->hashtable_->create_iterator();
 
     while(b2 = (atomic ? t->atomic_read_next() : t->read_next()))
     {
@@ -135,19 +154,27 @@ WriteTable* StoreCopy::realprobeCursor(PageCursor* t, HashTable *hashtable, Writ
                 << " having key " << s2->as_long(tup2, ja2_) << endl;
 #endif
             unsigned long long value = s2_->as_long(tup2,ja2_);
+            if(value < cond_s_ || value > cond_e_)
+            {
+                continue;
+            }
             curbuc = murmurhash2(&value, s2_->get_column_type_size(ja2_),0);
 #ifdef VERBOSE
             cout << "\twith bucket " << setfill('0') << setw(6) << curbuc << endl;
 #endif
             buckpos = curbuc % nbuckets;
             //cout<< "Joined value is " << value <<"\t" << "cur is "<< curbuc << "\t" <<"buckpos is "<<buckpos<<"\t"<<"size is "<<sizeof(s2_->get_column_type_size(ja2_))<<endl;
-            hashtable->place_iterator(it,buckpos);
+            node->hashtable_->place_iterator(it,buckpos);
 
 #ifdef PREFETCH
 #warning Only works for 16-byte tuples!
-            hashtable->prefetch(murmurhash2(s2_->as_pointer(reinterpret_cast<void*>((char*)tup2+32),ja2_), sizeof(s2_,ja2_),0));
-            hashtable->prefetch(murmurhash2(s2_->as_pointer(reinterpret_cast<void*>((char*)tup2+32),ja2_), sizeof(s2_,ja2_),0));
+            node->hashtable_->prefetch(murmurhash2(s2_->as_pointer(reinterpret_cast<void*>((char*)tup2+32),ja2_), sizeof(s2_,ja2_),0));
+            node->hashtable_->prefetch(murmurhash2(s2_->as_pointer(reinterpret_cast<void*>((char*)tup2+32),ja2_), sizeof(s2_,ja2_),0));
 #endif
+//            if(it.read_next() == NULL)
+//            {
+//                cout <<"Empty!" << flush<<endl;
+//            }
             while(tup1 = it.read_next())
             {
                 if(sbuild_->as_long(tup1,0) != value)
@@ -201,16 +228,16 @@ void StorePointer::init(Schema *schema1, vector<unsigned int> select1, unsigned 
 }
 
 
-void StorePointer::buildCursor(PageCursor *t, bool atomic)
+void StorePointer::buildCursor(PageCursor *t, ht_node* node ,bool atomic)
 {
     if(atomic)
-        realbuildCursor<true>(t);
+        realbuildCursor<true>(t,node);
     else
-        realbuildCursor<false>(t);
+        realbuildCursor<false>(t,node);
 }
 
 template <bool atomic>
-void StorePointer::realbuildCursor(PageCursor* t, HashTable* hashtable)
+void StorePointer::realbuildCursor(PageCursor* t, ht_node* node)
 {
     int i = 0;
     void* tup;
@@ -224,8 +251,8 @@ void StorePointer::realbuildCursor(PageCursor* t, HashTable* hashtable)
             // find hash table to append
             curbuc = murmurhash2(s->as_pointer(tup,ja1_),s->get_column_type_size(ja1_),0);
             void* target = atomic ?
-                hashtable->atomic_allocate(curbuc) :
-                hashtable->allocate(curbuc);
+                node->hashtable_->atomic_allocate(curbuc) :
+                node->hashtable_->allocate(curbuc);
 
 #ifdef VERBOSE
         cout << "Adding tuple with key "
@@ -242,15 +269,15 @@ void StorePointer::realbuildCursor(PageCursor* t, HashTable* hashtable)
 
 
 
-WriteTable* StorePointer::probeCursor(PageCursor *t, HashTable *hashtable, bool atomic, WriteTable *ret)
+WriteTable* StorePointer::probeCursor(PageCursor *t, ht_node *node, bool atomic, WriteTable *ret)
 {
     if (atomic)
-        return realprobeCursor<true>(t, ret);
-    return realprobeCursor<false>(t, ret);
+        return realprobeCursor<true>(t, node, ret);
+    return realprobeCursor<false>(t, node, ret);
 }
 
 template <bool atomic>
-WriteTable* StorePointer::realprobeCursor(PageCursor* t, HashTable* hashtable ,WriteTable* ret)
+WriteTable* StorePointer::realprobeCursor(PageCursor* t, ht_node *node , WriteTable* ret)
 {
     if (ret == NULL) {
         ret = new WriteTable();
@@ -263,18 +290,18 @@ WriteTable* StorePointer::realprobeCursor(PageCursor* t, HashTable* hashtable ,W
     Page* b2;
     unsigned int curbuc, i;
 
-    HashTable::Iterator it = hashtable->create_iterator();
+    HashTable::Iterator it = node->hashtable_->create_iterator();
 
     while (b2 = (atomic ? t->atomic_read_next() : t->read_next())) {
         i = 0;
         while (tup2 = b2->get_tuple_offset(i++)) {
             curbuc = murmurhash2(s2_->as_pointer(tup2,ja2_), sizeof(s2_->get_column_type_size(ja2_)),0);
-            hashtable->place_iterator(it, curbuc);
+            node->hashtable_->place_iterator(it, curbuc);
 
 #ifdef PREFETCH
 #warning Only works for 16-byte tuples!
-            hashtable->prefetch(murmurhash2(s2_->as_pointer(reinterpret_cast<void*>((char*)tup2+32),ja2_), sizeof(s2_,ja2_),0));
-            hashtable->prefetch(murmurhash2(s2_->as_pointer(reinterpret_cast<void*>((char*)tup2+32),ja2_), sizeof(s2_,ja2_),0));
+            node->hashtable_->prefetch(murmurhash2(s2_->as_pointer(reinterpret_cast<void*>((char*)tup2+32),ja2_), sizeof(s2_,ja2_),0));
+            node->hashtable_->prefetch(murmurhash2(s2_->as_pointer(reinterpret_cast<void*>((char*)tup2+32),ja2_), sizeof(s2_,ja2_),0));
 #endif
 
             while (tup1 = it.read_next()) {

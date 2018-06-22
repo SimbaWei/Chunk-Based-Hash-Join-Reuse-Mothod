@@ -59,6 +59,7 @@ void BaseAlgo::destroy()
     // delete sout;
     delete sbuild_;
     delete s1_;
+    delete sout_;
 }
 
 BaseAlgo::BaseAlgo(const libconfig::Setting& cfg)

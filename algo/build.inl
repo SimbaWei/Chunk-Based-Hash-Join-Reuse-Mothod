@@ -16,7 +16,7 @@
 */
 
 template <typename Super>
-void BuildPhase<Super>::build(PageCursor* t,HashTable* hashtable)
+void BuildPhase<Super>::build(PageCursor* t,ht_node* node)
 {
-    Super::buildCursor(t,hashtable,true);
+    Super::buildCursor(t,node,true);
 }

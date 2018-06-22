@@ -73,6 +73,7 @@ common/page.cpp
 common/page.h
 common/parser.cpp
 common/parser.h
+common/rdtsc.h
 common/schema.cpp
 common/schema.h
 common/table.cpp

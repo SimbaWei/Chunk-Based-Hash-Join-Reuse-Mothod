@@ -26,9 +26,12 @@
 #include "joinerfactory.h"
 #include <cstdlib>
 #include <ctime>
+#include "common/rdtsc.h"
 
 using namespace libconfig;
 using namespace std;
+
+#define random(x) (rand()%x)
 
 vector<unsigned int> createIntVector(const Setting& line)
 {
@@ -45,6 +48,30 @@ vector<unsigned int> createIntVector(const Setting& line)
 BaseAlgo* joiner;
 unsigned int joinattr1, joinattr2;
 
+unsigned long long timer1, timer2;
+
+inline void initchkpt(void)
+{
+    startTimer(&timer1);
+    startTimer(&timer2);
+}
+
+inline void buildchkpt(void)
+{
+    stopTimer(&timer1);
+}
+
+inline void probechkpt(void)
+{
+    stopTimer(&timer2);
+}
+
+inline void resetchkpt(void)
+{
+    timer1 = 0;
+    timer2 = 0;
+}
+
 int main(int argc, char** argv)
 {
     // must specify one file
@@ -58,11 +85,13 @@ int main(int argc, char** argv)
     Table* tin, * tout;
     Schema sin, sout;
     string datapath, infilename, outfilename, outputfile;
+    unsigned int buffsize;
     unsigned int bucksize;
     vector<unsigned int> select1, select2;
     unsigned int num;
     unsigned int selectivity;
     unsigned long long total;
+    unsigned long long cond_s, cond_e;
 
     Config cfg;
 
@@ -72,14 +101,15 @@ int main(int argc, char** argv)
     datapath = (const char*) cfg.lookup("path");
     outputfile = (const char*) cfg.lookup("output");
 
+    bucksize = cfg.lookup("algorithm.buildpagesize");
     num  = cfg.lookup("algorithm.num");
-    selectivity =  cfg.lookup("algorithm.num");
-    total = cfg.lookup("algorithm.total");
+    selectivity =  cfg.lookup("algorithm.selectivity");
+    total = 1048576;/*(unsigned long long)cfg.lookup("algorithm.total");*/
     infilename = (const char*)cfg.lookup("build.file");
-    bucksize = cfg.lookup("bucksize");
+    buffsize = cfg.lookup("buffsize");
     sin = Schema::create(cfg.lookup("build.schema"));
     WriteTable wr1;
-    wr1.init(&sin,bucksize);
+    wr1.init(&sin,buffsize);
     tin = &wr1;
     joinattr1 = cfg.lookup("build.jattr");
     joinattr1--;
@@ -87,7 +117,7 @@ int main(int argc, char** argv)
 
     sout = Schema::create(cfg.lookup("probe.schema"));
     WriteTable wr2;
-    wr2.init(&sout,bucksize);
+    wr2.init(&sout,buffsize);
     tout = &wr2;
     outfilename = (const char*) cfg.lookup("probe.file");
     joinattr2 = cfg.lookup("probe.jattr");
@@ -118,25 +148,64 @@ int main(int argc, char** argv)
     cout << "OK" << endl;
 
     // run hash join
-    cout << "Running hash join algorithm!" << flush;
+//    cout << "Running hash join algorithm!" << flush;
 
-    joiner->init(tin->schema(),select1,joinattr1,
-            tout->schema(),select2,joinattr2);
+//    joiner->init(tin->schema(),select1,joinattr1,
+//            tout->schema(),select2,joinattr2,selectivity);
 
     cout << endl;
-    cout << "Finishing the joiner init!" << flush;
+    cout << "Finishing the joiner init!" << flush<<endl;
 
+    ReuseCache *cache =(ReuseCache*)new ReuseCache(1024*1024);
+    srand((int)time(0));
+    ht_node* node = NULL;
     for(unsigned int i = 0; i < num; i++)
     {
-        srand((unsigned)time(NULL));
-        random(1,total);
+        cout<<"Running hash join algorithm! Join No.: "<<i<<flush<<endl;
+        cond_s = random(total/100*(100-selectivity));
+        cond_e = cond_s + total/100*selectivity;
+        cout<<"predication filter ["<<cond_s<<", "<<cond_e<<"]"<<flush<<endl;
+        initchkpt();
+
+        if(NULL == (node = cache->get_reusable_ht(cond_s,cond_e)))
+        {
+            node = cache->insert(cond_s,cond_e,bucksize,buffsize);
+            joiner->init(tin->schema(),select1,joinattr1,
+                         tout->schema(),select2,joinattr2,
+                         selectivity,cond_s,cond_e);
+            //node->hashtable_->print();
+        }
+        else
+        {
+            cout << "Got a reusable hashtable["<<node->start_value_<<","<<node->end_value_<<"]!" <<flush <<endl;
+            //node->hashtable_->print();
+            joiner->init(tin->schema(),select1,joinattr1,
+                         tout->schema(),select2,joinattr2,
+                         selectivity,cond_s,cond_e);
+        }
+
+        //cache.print_cache();
+        joiner->build(tin,node);
+        buildchkpt();
+        //node->hashtable_->print();
+        PageCursor* t = joiner->probe(tout,node);
+        probechkpt();
+        cout<< "RUNTIME TOTAL, BUILD_PART: "<<timer1<<" PROBE_PART: "<<timer2-timer1<<" TOTAL: "<<timer2<<endl;
+        cout<<"Finshing hash join algorithm! Join No.: "<<i<<flush<<endl;
+        t->close();
+        delete t;
+        cout<<endl;
+        tin->reset();
+        tout->reset();
+        resetchkpt();
     }
 
-    joiner->build(tin);
+//    joiner->build(tin);
 
-    PageCursor* t = joiner->probe(tout);
+//    PageCursor* t = joiner->probe(tout);
 
     joiner->destroy();
+    cache->destroy();
 
     cout << "OK" << endl;
 
@@ -162,9 +231,9 @@ int main(int argc, char** argv)
 
     wr2.close();
 
-    t->close();
+    //t->close();
 
-    delete t;
+    //delete t;
 
     return 0;
 }

@@ -24,7 +24,7 @@
 #include "../common/hash.h"
 #include "../common/lock.h"
 #include "hashtable.h"
-#include "common/cache.h"
+#include "../common/cache.h"
 
 
 class BaseAlgo
@@ -40,8 +40,8 @@ class BaseAlgo
 
         virtual void destroy();
 
-        virtual void build(PageCursor* t, HashTable* hashtable) = 0;
-        virtual PageCursor* probe(PageCursor* t, HashTable* hashtable) = 0;
+        virtual void build(PageCursor* t, ht_node* node) = 0;
+        virtual PageCursor* probe(PageCursor* t, ht_node* node) = 0;
     protected:
         Schema* s1_, * s2_, * sout_, * sbuild_;
         vector<unsigned int> sel1_, sel2_;
@@ -60,8 +60,8 @@ class HashBase : public BaseAlgo
            Schema* schema2, vector<unsigned int> select2, unsigned int jattr2,
            unsigned int selectivity, unsigned long long cond_s, unsigned long long cond_e);
         virtual void destroy();
-        virtual void build(PageCursor* t, HashTable* hashtable) = 0;
-        virtual PageCursor* probe(PageCursor* t, HashTable* hashtable) = 0;
+        virtual void build(PageCursor* t, ht_node* node) = 0;
+        virtual PageCursor* probe(PageCursor* t, ht_node* node) = 0;
     protected:
         //HashTable hashtable_;
         int outputsize_;
@@ -79,20 +79,20 @@ class StoreCopy : public HashBase
            unsigned int selectivity, unsigned long long cond_s, unsigned long long cond_e);
         virtual void destroy();
 
-        virtual void build(PageCursor* t, HashTable* hashtable) = 0;
-        virtual PageCursor* probe(PageCursor* t, HashTable* hashtable) = 0;
+        virtual void build(PageCursor* t, ht_node* node) = 0;
+        virtual PageCursor* probe(PageCursor* t, ht_node* node) = 0;
 
     protected:
-        void buildCursor(PageCursor* t, HashTable* hashtable,bool atomic);
+        void buildCursor(PageCursor* t, ht_node* node,bool atomic);
 
-        WriteTable* probeCursor(PageCursor* t, HashTable* hashtable ,bool atomic, WriteTable* ret = NULL);
+        WriteTable* probeCursor(PageCursor* t, ht_node* node ,bool atomic, WriteTable* ret = NULL);
 
     private:
         template <bool atomic>
-        void realbuildCursor(PageCursor* t, HashTable* hashtable);
+        void realbuildCursor(PageCursor* t, ht_node* node);
 
         template <bool atomic>
-        WriteTable* realprobeCursor(PageCursor* t, HashTable* hashtable, WriteTable* ret = NULL);
+        WriteTable* realprobeCursor(PageCursor* t, ht_node* node, WriteTable* ret = NULL);
 };
 
 class StorePointer : public HashBase
@@ -107,20 +107,20 @@ class StorePointer : public HashBase
             unsigned int selectivity, unsigned long long cond_s, unsigned long long cond_e);
         virtual void destroy();
 
-        virtual void build(PageCursor* t, HashTable* hashtable) = 0;
-        virtual PageCursor* probe(PageCursor* t, HashTable* hashtable) = 0;
+        virtual void build(PageCursor* t, ht_node* node) = 0;
+        virtual PageCursor* probe(PageCursor* t, ht_node* node) = 0;
 
     protected:
-        void buildCursor(PageCursor* t, HashTable* hashtable ,bool atomic);
+        void buildCursor(PageCursor* t, ht_node* node ,bool atomic);
 
-        WriteTable* probeCursor(PageCursor* t, HashTable* hashtable, bool atomic, WriteTable* ret = NULL);
+        WriteTable* probeCursor(PageCursor* t, ht_node* node, bool atomic, WriteTable* ret = NULL);
 
     private:
         template <bool atomic>
-        void realbuildCursor(PageCursor* t, HashTable* hashtable);
+        void realbuildCursor(PageCursor* t, ht_node* node);
 
         template <bool atomic>
-        WriteTable* realprobeCursor(PageCursor* t, HashTable* hashtable ,WriteTable* ret = NULL);
+        WriteTable* realprobeCursor(PageCursor* t, ht_node* node ,WriteTable* ret = NULL);
 };
 
 template <typename Super>
@@ -129,7 +129,7 @@ class BuildPhase : public Super
     public:
         BuildPhase(const libconfig::Setting& cfg) : Super(cfg) {}
         virtual ~BuildPhase() {}
-        virtual void build(PageCursor* t, HashTable* hashtable);
+        virtual void build(PageCursor* t, ht_node* node);
 };
 
 
@@ -139,7 +139,7 @@ class ProbePhase : public Super
     public:
         ProbePhase(const libconfig::Setting& cfg) : Super(cfg) {}
         virtual ~ProbePhase() {}
-        virtual PageCursor* probe(PageCursor* t, HashTable* hashtable);
+        virtual PageCursor* probe(PageCursor* t, ht_node* node);
 };
 
 

@@ -20,6 +20,9 @@
 
 #include "../common/lock.h"
 #include <cassert>
+#include <iostream>
+
+using namespace std;
 
 class HashTable
 {
@@ -118,6 +121,14 @@ class HashTable
 #ifdef __x86_64__
             __asm__ __volatile__ ("prefetcht0 %0" :: "m" (*(unsigned long long*) bucket_[offset & (nbuckets_-1)]));
 #endif
+        }
+
+        inline void print()
+        {
+            for(unsigned int i = 0; i < 10; i++)
+            {
+                cout<<"Bucket["<<i<<"]: "<<reinterpret_cast<const char*>((reinterpret_cast<char*>(bucket_[i])+sizeof(unsigned long long)))<<flush<<endl;
+            }
         }
 
     private:
